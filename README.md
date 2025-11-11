@@ -1,6 +1,6 @@
 # EventDBX Client
 
-Async Rust client for the EventDBX. The library wraps the Cap'n Proto
+Async Rust client for EventDBX. The library wraps the Cap'n Proto
 wire protocol exposed by EventDBX so applications can programmatically list aggregates
 and events, append or patch data, select subsets of fields, toggle archive status, and
 verify Merkle roots.
