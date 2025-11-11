@@ -1,0 +1,46 @@
+[package]
+name = "eventdbx-client"
+version = "0.1.0"
+edition = "2024"
+build = "build.rs"
+authors = ["Patrick Thach <thachp@gmail.com>"]
+description = "Async Rust client and CLI for the EventDBX control plane."
+license = "Apache-2.0"
+repository = "https://github.com/eventdbx/eventdbx-client"
+homepage = "https://eventdbx.com"
+documentation = "https://docs.eventdbx.com/client-sdks/rust"
+keywords = ["eventdbx", "event-sourcing", "capnp", "client"]
+categories = ["development-tools", "database"]
+readme = "README.md"
+
+[lib]
+name = "eventdbx_client"
+path = "src/lib.rs"
+
+[features]
+default = []
+telemetry = ["dep:tracing"]
+
+[[bin]]
+name = "dbxtest-cli"
+path = "src/main.rs"
+
+default-run = "dbxtest-cli"
+
+[dependencies]
+futures = "0.3"
+capnp = "0.19"
+capnp-futures = "0.19"
+sha2 = "0.10"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+snow = "0.9"
+thiserror = "1.0"
+tokio = { version = "1.38", features = ["macros", "net", "rt-multi-thread", "io-util", "sync", "time"] }
+tokio-util = { version = "0.7", features = ["compat"] }
+tracing = { version = "0.1", optional = true }
+clap = { version = "4.5", features = ["derive"] }
+fake = "2.9"
+
+[build-dependencies]
+capnpc = "0.19"
