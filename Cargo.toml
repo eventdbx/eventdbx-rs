@@ -1,10 +1,10 @@
 [package]
 name = "eventdbx-client"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2024"
 build = "build.rs"
 authors = ["Patrick Thach <thachp@gmail.com>"]
-description = "Async Rust client and CLI for the EventDBX control plane."
+description = "Async Rust client and CLI for EventDBX"
 license = "MIT"
 repository = "https://github.com/eventdbx/eventdbx-client"
 homepage = "https://eventdbx.com"

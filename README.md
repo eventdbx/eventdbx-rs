@@ -1,6 +1,6 @@
 # EventDBX Client
 
-Async Rust client for the EventDBX control plane. The library wraps the Cap'n Proto
+Async Rust client for the EventDBX. The library wraps the Cap'n Proto
 wire protocol exposed by EventDBX so applications can programmatically list aggregates
 and events, append or patch data, select subsets of fields, toggle archive status, and
 verify Merkle roots.
@@ -89,10 +89,10 @@ Available commands mirror the client surface area: `list`, `select`, `get`, `eve
 generated via the `fake` crate, which makes it easy to sanity-check serialization. Examples:
 
 ```bash
-cargo run --bin dbxtest-cli -- list --take 5
-cargo run --bin dbxtest-cli -- append --aggregate-type person --aggregate-id p-1 \
+cargo run list --take 5
+cargo run append --aggregate-type person --aggregate-id p-1 \
   --event-type person_created --payload '{"status":"active"}'
-cargo run --bin dbxtest-cli -- verify --aggregate-type person --aggregate-id p-1
+cargo run verify --aggregate-type person --aggregate-id p-1
 ```
 
 ## Updating the Schema
