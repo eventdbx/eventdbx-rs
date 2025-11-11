@@ -5,12 +5,12 @@ edition = "2024"
 build = "build.rs"
 authors = ["Patrick Thach <thachp@gmail.com>"]
 description = "Async Rust client and CLI for the EventDBX control plane."
-license = "Apache-2.0"
+license = "MIT"
 repository = "https://github.com/eventdbx/eventdbx-client"
 homepage = "https://eventdbx.com"
 documentation = "https://docs.eventdbx.com/client-sdks/rust"
 keywords = ["eventdbx", "event-sourcing", "capnp", "client"]
-categories = ["development-tools", "database"]
+categories = ["database"]
 readme = "README.md"
 
 [lib]
