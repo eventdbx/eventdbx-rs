@@ -43,9 +43,9 @@ use serde_json::json;
 
 #[tokio::main]
 async fn main() -> eventdbx_client::Result<()> {
-    let config = ClientConfig::new("127.0.0.1", "token")
-        .with_tenant("tenant")
-        .with_port(7000);
+    let config = ClientConfig::new("127.0.0.1", "<token>")
+        .with_tenant("tenant-123") // custom tenant
+        .with_port(7000);          // custom port, 6363
     let client = EventDbxClient::connect(config).await?;
 
     // list aggregates
