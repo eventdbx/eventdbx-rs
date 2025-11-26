@@ -8,6 +8,7 @@ fn client_config_defaults() {
     assert_eq!(config.port, 6363, "default port should be 6363");
     assert_eq!(config.tenant_id, "default");
     assert_eq!(config.address(), "example.com:6363");
+    assert!(config.use_noise, "Noise should be enabled by default");
 }
 
 #[test]
@@ -16,10 +17,12 @@ fn client_config_overrides() {
         .with_tenant("acme")
         .with_port(7000)
         .with_protocol_version(2)
-        .with_request_timeout(None);
+        .with_request_timeout(None)
+        .with_noise(false);
 
     assert_eq!(config.tenant_id, "acme");
     assert_eq!(config.port, 7000);
     assert_eq!(config.protocol_version, 2);
     assert!(config.request_timeout.is_none());
+    assert!(!config.use_noise);
 }

@@ -131,8 +131,8 @@ enum Commands {
         aggregate_id: Option<String>,
         #[arg(long, default_value_t = true)]
         archived: bool,
-        #[arg(long)]
-        comment: Option<String>,
+        #[arg(long, alias = "comment")]
+        note: Option<String>,
     },
     /// Verify an aggregate's Merkle root.
     Verify {
@@ -312,7 +312,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             aggregate_type,
             aggregate_id,
             archived,
-            comment,
+            note,
         } => {
             let aggregate_type = aggregate_type.unwrap_or_else(random_aggregate_type);
             let aggregate_id = aggregate_id.unwrap_or_else(random_aggregate_id);
@@ -321,7 +321,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 aggregate_id.clone(),
                 archived,
             );
-            request.comment = comment;
+            request.note = note;
 
             let result = client.set_aggregate_archive(request).await?;
             println!("{}", serde_json::to_string_pretty(&result.aggregate)?);

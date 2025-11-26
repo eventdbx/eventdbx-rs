@@ -6,8 +6,8 @@ use std::sync::{
 use capnp::message::ReaderOptions;
 use capnp::serialize::{self, write_message_to_words};
 use capnp_futures::serialize as capnp_async;
-use futures::io::AsyncWriteExt as FuturesAsyncWriteExt;
-use std::io::Cursor;
+use futures::io::{AsyncReadExt as FuturesAsyncReadExt, AsyncWriteExt as FuturesAsyncWriteExt};
+use std::io::{Cursor, ErrorKind};
 use tokio::net::TcpStream;
 use tokio::net::tcp::{OwnedReadHalf, OwnedWriteHalf};
 use tokio::sync::Mutex;
@@ -66,6 +66,7 @@ impl EventDbxClient {
         &self,
         options: ListAggregatesOptions,
     ) -> Result<ListAggregatesResult> {
+        let sort_text = self.encode_sort_options(&options);
         self.invoke(
             |request| {
                 let mut payload = request.reborrow().init_payload();
@@ -92,32 +93,11 @@ impl EventDbxClient {
                     list.set_has_filter(false);
                 }
 
-                if options.sort.is_empty() {
-                    list.set_has_sort(false);
-                } else {
+                if let Some(sort) = sort_text.as_deref() {
                     list.set_has_sort(true);
-                    let mut sort = list.reborrow().init_sort(options.sort.len() as u32);
-                    for (idx, sort_entry) in options.sort.iter().enumerate() {
-                        let mut entry = sort.reborrow().get(idx as u32);
-                        entry.set_descending(sort_entry.descending);
-                        entry.set_field(match sort_entry.field {
-                            AggregateSortField::AggregateType => {
-                                control_capnp::AggregateSortField::AggregateType
-                            }
-                            AggregateSortField::AggregateId => {
-                                control_capnp::AggregateSortField::AggregateId
-                            }
-                            AggregateSortField::Version => {
-                                control_capnp::AggregateSortField::Version
-                            }
-                            AggregateSortField::MerkleRoot => {
-                                control_capnp::AggregateSortField::MerkleRoot
-                            }
-                            AggregateSortField::Archived => {
-                                control_capnp::AggregateSortField::Archived
-                            }
-                        });
-                    }
+                    list.set_sort(sort);
+                } else {
+                    list.set_has_sort(false);
                 }
 
                 list.set_include_archived(options.include_archived);
@@ -327,6 +307,31 @@ impl EventDbxClient {
                 } else {
                     append.set_has_metadata(false);
                 }
+
+                if request.publish_targets.is_empty() {
+                    append.set_has_publish_targets(false);
+                } else {
+                    append.set_has_publish_targets(true);
+                    let mut targets = append
+                        .reborrow()
+                        .init_publish_targets(request.publish_targets.len() as u32);
+                    for (idx, target) in request.publish_targets.iter().enumerate() {
+                        let mut dest = targets.reborrow().get(idx as u32);
+                        dest.set_plugin(&target.plugin);
+                        if let Some(mode) = target.mode.as_deref() {
+                            dest.set_mode(mode);
+                            dest.set_has_mode(true);
+                        } else {
+                            dest.set_has_mode(false);
+                        }
+                        if let Some(priority) = target.priority.as_deref() {
+                            dest.set_priority(priority);
+                            dest.set_has_priority(true);
+                        } else {
+                            dest.set_has_priority(false);
+                        }
+                    }
+                }
                 Ok(())
             },
             |response| match response.get_payload().which()? {
@@ -371,6 +376,31 @@ impl EventDbxClient {
                     patch.set_has_metadata(true);
                 } else {
                     patch.set_has_metadata(false);
+                }
+
+                if request.publish_targets.is_empty() {
+                    patch.set_has_publish_targets(false);
+                } else {
+                    patch.set_has_publish_targets(true);
+                    let mut targets = patch
+                        .reborrow()
+                        .init_publish_targets(request.publish_targets.len() as u32);
+                    for (idx, target) in request.publish_targets.iter().enumerate() {
+                        let mut dest = targets.reborrow().get(idx as u32);
+                        dest.set_plugin(&target.plugin);
+                        if let Some(mode) = target.mode.as_deref() {
+                            dest.set_mode(mode);
+                            dest.set_has_mode(true);
+                        } else {
+                            dest.set_has_mode(false);
+                        }
+                        if let Some(priority) = target.priority.as_deref() {
+                            dest.set_priority(priority);
+                            dest.set_has_priority(true);
+                        } else {
+                            dest.set_has_priority(false);
+                        }
+                    }
                 }
                 Ok(())
             },
@@ -420,6 +450,31 @@ impl EventDbxClient {
                 } else {
                     create.set_has_metadata(false);
                 }
+
+                if request.publish_targets.is_empty() {
+                    create.set_has_publish_targets(false);
+                } else {
+                    create.set_has_publish_targets(true);
+                    let mut targets = create
+                        .reborrow()
+                        .init_publish_targets(request.publish_targets.len() as u32);
+                    for (idx, target) in request.publish_targets.iter().enumerate() {
+                        let mut dest = targets.reborrow().get(idx as u32);
+                        dest.set_plugin(&target.plugin);
+                        if let Some(mode) = target.mode.as_deref() {
+                            dest.set_mode(mode);
+                            dest.set_has_mode(true);
+                        } else {
+                            dest.set_has_mode(false);
+                        }
+                        if let Some(priority) = target.priority.as_deref() {
+                            dest.set_priority(priority);
+                            dest.set_has_priority(true);
+                        } else {
+                            dest.set_has_priority(false);
+                        }
+                    }
+                }
                 Ok(())
             },
             |response| match response.get_payload().which()? {
@@ -440,7 +495,7 @@ impl EventDbxClient {
         .await
     }
 
-    /// Toggles whether the aggregate is archived and optionally leaves a comment.
+    /// Toggles whether the aggregate is archived and optionally leaves a note.
     pub async fn set_aggregate_archive(
         &self,
         request: SetAggregateArchiveRequest,
@@ -454,11 +509,11 @@ impl EventDbxClient {
                 set_archive.set_archived(request.archived);
                 set_archive.set_token(self.token(request.token.as_deref()));
 
-                if let Some(comment) = request.comment.as_deref() {
-                    set_archive.set_comment(comment);
-                    set_archive.set_has_comment(true);
+                if let Some(note) = request.note.as_deref() {
+                    set_archive.set_note(note);
+                    set_archive.set_has_note(true);
                 } else {
-                    set_archive.set_has_comment(false);
+                    set_archive.set_has_note(false);
                 }
                 Ok(())
             },
@@ -528,6 +583,34 @@ impl EventDbxClient {
         override_token.unwrap_or(self.config.token.as_str())
     }
 
+    fn encode_sort_options(&self, options: &ListAggregatesOptions) -> Option<String> {
+        if let Some(text) = options.sort_text.as_ref() {
+            let trimmed = text.trim();
+            if !trimmed.is_empty() {
+                return Some(trimmed.to_string());
+            }
+        }
+
+        if options.sort.is_empty() {
+            return None;
+        }
+
+        let mut parts = Vec::with_capacity(options.sort.len());
+        for sort in &options.sort {
+            let field = match sort.field {
+                AggregateSortField::AggregateType => "aggregate_type",
+                AggregateSortField::AggregateId => "aggregate_id",
+                AggregateSortField::Archived => "archived",
+                AggregateSortField::CreatedAt => "created_at",
+                AggregateSortField::UpdatedAt => "updated_at",
+            };
+            let order = if sort.descending { "desc" } else { "asc" };
+            parts.push(format!("{field}:{order}"));
+        }
+
+        Some(parts.join(", "))
+    }
+
     async fn invoke<F, R>(
         &self,
         build_payload: F,
@@ -549,13 +632,13 @@ impl EventDbxClient {
 
         let response_bytes = {
             let mut transport = self.transport.lock().await;
-            transport.write_encrypted(&payload).await?;
+            transport.write_frame(&payload).await?;
             if let Some(timeout) = self.config.request_timeout {
-                time::timeout(timeout, transport.read_encrypted())
+                time::timeout(timeout, transport.read_frame())
                     .await
                     .map_err(|_| Error::Timeout)??
             } else {
-                transport.read_encrypted().await?
+                transport.read_frame().await?
             }
         };
 
@@ -585,6 +668,7 @@ async fn perform_handshake(config: &ClientConfig, stream: TcpStream) -> Result<C
         hello.set_protocol_version(config.protocol_version);
         hello.set_token(&config.token);
         hello.set_tenant_id(&config.tenant_id);
+        hello.set_no_noise(!config.use_noise);
     }
 
     let buffer = write_message_to_words(&message);
@@ -606,7 +690,12 @@ async fn perform_handshake(config: &ClientConfig, stream: TcpStream) -> Result<C
         return Err(Error::Authentication(message));
     }
 
-    let noise = perform_client_handshake(&mut reader, &mut writer, config.token.as_bytes()).await?;
+    let use_noise = config.use_noise && !response.get_no_noise();
+    let noise = if use_noise {
+        Some(perform_client_handshake(&mut reader, &mut writer, config.token.as_bytes()).await?)
+    } else {
+        None
+    };
     Ok(ClientTransport {
         reader,
         writer,
@@ -631,21 +720,64 @@ fn capnp_text_to_string(reader: capnp::Result<capnp::text::Reader<'_>>) -> Resul
 struct ClientTransport {
     reader: Compat<OwnedReadHalf>,
     writer: Compat<OwnedWriteHalf>,
-    noise: TransportState,
+    noise: Option<TransportState>,
 }
 
 impl ClientTransport {
-    async fn write_encrypted(&mut self, payload: &[u8]) -> Result<()> {
-        write_encrypted_frame(&mut self.writer, &mut self.noise, payload).await?;
+    async fn write_frame(&mut self, payload: &[u8]) -> Result<()> {
+        if let Some(noise) = self.noise.as_mut() {
+            write_encrypted_frame(&mut self.writer, noise, payload).await?;
+        } else {
+            write_plain_frame(&mut self.writer, payload).await?;
+        }
         Ok(())
     }
 
-    async fn read_encrypted(&mut self) -> Result<Vec<u8>> {
-        match read_encrypted_frame(&mut self.reader, &mut self.noise).await? {
+    async fn read_frame(&mut self) -> Result<Vec<u8>> {
+        let maybe_bytes = if let Some(noise) = self.noise.as_mut() {
+            read_encrypted_frame(&mut self.reader, noise).await?
+        } else {
+            read_plain_frame(&mut self.reader).await?
+        };
+
+        match maybe_bytes {
             Some(bytes) => Ok(bytes),
             None => Err(Error::Protocol(
                 "control connection closed unexpectedly".to_string(),
             )),
         }
     }
+}
+
+async fn write_plain_frame<W>(writer: &mut W, payload: &[u8]) -> Result<()>
+where
+    W: futures::io::AsyncWrite + Unpin,
+{
+    if payload.len() > u32::MAX as usize {
+        return Err(Error::Protocol(
+            "frame payload exceeds u32 length".to_string(),
+        ));
+    }
+    let mut header = [0u8; 4];
+    header.copy_from_slice(&(payload.len() as u32).to_be_bytes());
+    FuturesAsyncWriteExt::write_all(writer, &header).await?;
+    FuturesAsyncWriteExt::write_all(writer, payload).await?;
+    FuturesAsyncWriteExt::flush(writer).await?;
+    Ok(())
+}
+
+async fn read_plain_frame<R>(reader: &mut R) -> Result<Option<Vec<u8>>>
+where
+    R: futures::io::AsyncRead + Unpin,
+{
+    let mut header = [0u8; 4];
+    match FuturesAsyncReadExt::read_exact(reader, &mut header).await {
+        Ok(()) => {}
+        Err(err) if err.kind() == ErrorKind::UnexpectedEof => return Ok(None),
+        Err(err) => return Err(Error::Io(err)),
+    }
+    let len = u32::from_be_bytes(header) as usize;
+    let mut buffer = vec![0u8; len];
+    FuturesAsyncReadExt::read_exact(reader, &mut buffer).await?;
+    Ok(Some(buffer))
 }

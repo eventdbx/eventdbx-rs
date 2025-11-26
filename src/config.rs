@@ -10,6 +10,7 @@ pub struct ClientConfig {
     pub protocol_version: u16,
     pub connect_timeout: Duration,
     pub request_timeout: Option<Duration>,
+    pub use_noise: bool,
 }
 
 impl ClientConfig {
@@ -23,6 +24,7 @@ impl ClientConfig {
             protocol_version: 1,
             connect_timeout: Duration::from_secs(5),
             request_timeout: Some(Duration::from_secs(10)),
+            use_noise: true,
         }
     }
 
@@ -41,6 +43,12 @@ impl ClientConfig {
     /// Overrides the per-request timeout. Use `None` to disable it.
     pub fn with_request_timeout(mut self, timeout: Option<Duration>) -> Self {
         self.request_timeout = timeout;
+        self
+    }
+
+    /// Enables or disables the Noise transport handshake. Defaults to true.
+    pub fn with_noise(mut self, use_noise: bool) -> Self {
+        self.use_noise = use_noise;
         self
     }
 

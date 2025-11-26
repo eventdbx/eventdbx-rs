@@ -27,18 +27,20 @@ struct ControlResponse {
     error @7 :ControlError;
     createAggregate @8 :CreateAggregateResponse;
     setAggregateArchive @9 :SetAggregateArchiveResponse;
-    }
+  }
 }
 
 struct ControlHello {
   protocolVersion @0 :UInt16;
   token @1 :Text;
   tenantId @2 :Text;
+  noNoise @3 :Bool;
 }
 
 struct ControlHelloResponse {
   accepted @0 :Bool;
   message @1 :Text;
+  noNoise @2 :Bool;
 }
 
 struct ListAggregatesRequest {
@@ -48,7 +50,7 @@ struct ListAggregatesRequest {
   hasTake @3 :Bool;
   filter @4 :Text;
   hasFilter @5 :Bool;
-  sort @6 :List(AggregateSort);
+  sort @6 :Text;
   hasSort @7 :Bool;
   includeArchived @8 :Bool;
   archivedOnly @9 :Bool;
@@ -100,6 +102,8 @@ struct AppendEventRequest {
   hasNote @6 :Bool;
   metadataJson @7 :Text;
   hasMetadata @8 :Bool;
+  publishTargets @9 :List(PublishTarget);
+  hasPublishTargets @10 :Bool;
 }
 
 struct AppendEventResponse {
@@ -116,6 +120,8 @@ struct PatchEventRequest {
   hasNote @6 :Bool;
   metadataJson @7 :Text;
   hasMetadata @8 :Bool;
+  publishTargets @9 :List(PublishTarget);
+  hasPublishTargets @10 :Bool;
 }
 
 struct VerifyAggregateRequest {
@@ -149,6 +155,8 @@ struct CreateAggregateRequest {
   hasNote @6 :Bool;
   metadataJson @7 :Text;
   hasMetadata @8 :Bool;
+  publishTargets @9 :List(PublishTarget);
+  hasPublishTargets @10 :Bool;
 }
 
 struct CreateAggregateResponse {
@@ -160,28 +168,23 @@ struct SetAggregateArchiveRequest {
   aggregateType @1 :Text;
   aggregateId @2 :Text;
   archived @3 :Bool;
-  comment @4 :Text;
-  hasComment @5 :Bool;
+  note @4 :Text;
+  hasNote @5 :Bool;
 }
 
 struct SetAggregateArchiveResponse {
   aggregateJson @0 :Text;
 }
 
-struct AggregateSort {
-  field @0 :AggregateSortField;
-  descending @1 :Bool;
-}
-
-enum AggregateSortField {
-  aggregateType @0;
-  aggregateId @1;
-  version @2;
-  merkleRoot @3;
-  archived @4;
-}
-
 struct ControlError {
   code @0 :Text;
   message @1 :Text;
+}
+
+struct PublishTarget {
+  plugin @0 :Text;
+  mode @1 :Text;
+  hasMode @2 :Bool;
+  priority @3 :Text;
+  hasPriority @4 :Bool;
 }

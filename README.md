@@ -1,4 +1,4 @@
-# EventDBX Client
+# EventDBX Rust Client
 
 Async Rust client for EventDBX. The library wraps the Cap'n Proto
 wire protocol exposed by EventDBX so applications can programmatically list aggregates
@@ -8,10 +8,10 @@ verify Merkle roots.
 ## Features
 
 - Tokio-based TCP client with automatic hello handshake and per-request timeouts.
+- Noise transport security is on by default; call `with_noise(false)` to request plaintext for tests.
 - High-level APIs for list/get/select aggregate queries, list events, append/create/patch
-  events, and archive toggling.
-- Strongly typed request builders backed by `serde_json::Value` to make working with JSON
-  payloads ergonomic.
+  events, archive toggling, and Merkle verification.
+- Mutation builders support notes, metadata, and publish targets to direct jobs to specific plugins.
 - Reusable `ClientConfig` so multiple clients can share the same runtime settings.
 
 ## Requirements
@@ -38,6 +38,7 @@ cargo check
 ```rust
 use eventdbx_client::{
     AppendEventRequest, ClientConfig, EventDbxClient, ListAggregatesOptions, PatchEventRequest,
+    PublishTarget,
 };
 use serde_json::json;
 
@@ -45,7 +46,7 @@ use serde_json::json;
 async fn main() -> eventdbx_client::Result<()> {
     let config = ClientConfig::new("127.0.0.1", "<token>")
         .with_tenant("tenant-123") // custom tenant
-        .with_port(7000);          // custom port, 6363
+        .with_port(7000); // custom port, 6363; call `.with_noise(false)` to request plaintext
     let client = EventDbxClient::connect(config).await?;
 
     // list aggregates
@@ -61,6 +62,9 @@ async fn main() -> eventdbx_client::Result<()> {
         "person_status_updated",
         json!({ "status": "active" }),
     );
+    append
+        .publish_targets
+        .push(PublishTarget::new("search-indexer").with_mode("event-only"));
     client.append_event(append).await?;
 
     // patch an existing event with JSON Patch semantics

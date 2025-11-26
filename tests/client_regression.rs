@@ -188,18 +188,10 @@ async fn list_aggregates_regression() -> TestResult<()> {
                 assert!(req.get_has_filter());
                 assert_eq!(read_text(req.get_filter()), "status = 'active'");
                 assert!(req.get_has_sort());
-                let sort = req.get_sort().unwrap();
-                assert_eq!(sort.len(), 2);
                 assert_eq!(
-                    sort.get(0).get_field().unwrap(),
-                    control_capnp::AggregateSortField::AggregateType
+                    read_text(req.get_sort()),
+                    "aggregate_type:asc, created_at:desc"
                 );
-                assert!(!sort.get(0).get_descending());
-                assert_eq!(
-                    sort.get(1).get_field().unwrap(),
-                    control_capnp::AggregateSortField::Version
-                );
-                assert!(sort.get(1).get_descending());
                 assert!(req.get_include_archived());
                 assert!(req.get_archived_only());
                 assert_eq!(read_text(req.get_token()), "override-token");
@@ -227,7 +219,7 @@ async fn list_aggregates_regression() -> TestResult<()> {
             descending: false,
         },
         AggregateSort {
-            field: AggregateSortField::Version,
+            field: AggregateSortField::CreatedAt,
             descending: true,
         },
     ];
@@ -555,8 +547,8 @@ async fn set_aggregate_archive_regression() -> TestResult<()> {
                 assert_eq!(read_text(req.get_aggregate_type()), "person");
                 assert_eq!(read_text(req.get_aggregate_id()), "p-5");
                 assert!(req.get_archived());
-                assert!(req.get_has_comment());
-                assert_eq!(read_text(req.get_comment()), "cleanup");
+                assert!(req.get_has_note());
+                assert_eq!(read_text(req.get_note()), "cleanup");
                 assert_eq!(read_text(req.get_token()), "archive-token");
             }
             _ => panic!("unexpected payload"),
@@ -571,7 +563,7 @@ async fn set_aggregate_archive_regression() -> TestResult<()> {
 
     let client = test_client(port).await?;
     let mut request = SetAggregateArchiveRequest::new("person", "p-5", true);
-    request.comment = Some("cleanup".into());
+    request.note = Some("cleanup".into());
     request.token = Some("archive-token".into());
 
     let result = client.set_aggregate_archive(request).await?;

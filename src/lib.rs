@@ -19,6 +19,6 @@ pub use crate::types::{
     AggregateSort, AggregateSortField, AppendEventRequest, AppendEventResult,
     CreateAggregateRequest, CreateAggregateResult, GetAggregateResult, ListAggregatesOptions,
     ListAggregatesResult, ListEventsOptions, ListEventsResult, PatchEventRequest, PatchEventResult,
-    SelectAggregateRequest, SelectAggregateResult, SetAggregateArchiveRequest,
+    PublishTarget, SelectAggregateRequest, SelectAggregateResult, SetAggregateArchiveRequest,
     SetAggregateArchiveResult, VerifyAggregateResult,
 };

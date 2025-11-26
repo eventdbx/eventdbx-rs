@@ -6,6 +6,7 @@ pub struct ListAggregatesOptions {
     pub take: Option<u64>,
     pub filter: Option<String>,
     pub sort: Vec<AggregateSort>,
+    pub sort_text: Option<String>,
     pub include_archived: bool,
     pub archived_only: bool,
     pub token: Option<String>,
@@ -21,9 +22,9 @@ pub struct AggregateSort {
 pub enum AggregateSortField {
     AggregateType,
     AggregateId,
-    Version,
-    MerkleRoot,
     Archived,
+    CreatedAt,
+    UpdatedAt,
 }
 
 #[derive(Debug, Clone)]
@@ -61,6 +62,7 @@ pub struct AppendEventRequest {
     pub note: Option<String>,
     pub metadata: Option<Value>,
     pub token: Option<String>,
+    pub publish_targets: Vec<PublishTarget>,
 }
 
 impl AppendEventRequest {
@@ -78,6 +80,7 @@ impl AppendEventRequest {
             note: None,
             metadata: None,
             token: None,
+            publish_targets: Vec::new(),
         }
     }
 }
@@ -96,6 +99,7 @@ pub struct PatchEventRequest {
     pub note: Option<String>,
     pub metadata: Option<Value>,
     pub token: Option<String>,
+    pub publish_targets: Vec<PublishTarget>,
 }
 
 impl PatchEventRequest {
@@ -113,6 +117,7 @@ impl PatchEventRequest {
             note: None,
             metadata: None,
             token: None,
+            publish_targets: Vec::new(),
         }
     }
 }
@@ -131,6 +136,7 @@ pub struct CreateAggregateRequest {
     pub note: Option<String>,
     pub metadata: Option<Value>,
     pub token: Option<String>,
+    pub publish_targets: Vec<PublishTarget>,
 }
 
 impl CreateAggregateRequest {
@@ -148,6 +154,7 @@ impl CreateAggregateRequest {
             note: None,
             metadata: None,
             token: None,
+            publish_targets: Vec::new(),
         }
     }
 }
@@ -191,7 +198,7 @@ pub struct SetAggregateArchiveRequest {
     pub aggregate_type: String,
     pub aggregate_id: String,
     pub archived: bool,
-    pub comment: Option<String>,
+    pub note: Option<String>,
     pub token: Option<String>,
 }
 
@@ -205,7 +212,7 @@ impl SetAggregateArchiveRequest {
             aggregate_type: aggregate_type.into(),
             aggregate_id: aggregate_id.into(),
             archived,
-            comment: None,
+            note: None,
             token: None,
         }
     }
@@ -219,4 +226,31 @@ pub struct SetAggregateArchiveResult {
 #[derive(Debug, Clone)]
 pub struct VerifyAggregateResult {
     pub merkle_root: String,
+}
+
+#[derive(Debug, Clone)]
+pub struct PublishTarget {
+    pub plugin: String,
+    pub mode: Option<String>,
+    pub priority: Option<String>,
+}
+
+impl PublishTarget {
+    pub fn new(plugin: impl Into<String>) -> Self {
+        Self {
+            plugin: plugin.into(),
+            mode: None,
+            priority: None,
+        }
+    }
+
+    pub fn with_mode(mut self, mode: impl Into<String>) -> Self {
+        self.mode = Some(mode.into());
+        self
+    }
+
+    pub fn with_priority(mut self, priority: impl Into<String>) -> Self {
+        self.priority = Some(priority.into());
+        self
+    }
 }
