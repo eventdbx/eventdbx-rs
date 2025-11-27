@@ -27,6 +27,10 @@ const TEST_HOST: &str = "127.0.0.1";
 const TEST_TOKEN: &str = "secret-token";
 const TEST_TENANT: &str = "tenant";
 
+mod schema_capnp {
+    include!(concat!(env!("OUT_DIR"), "/schema_capnp.rs"));
+}
+
 mod control_capnp {
     include!(concat!(env!("OUT_DIR"), "/control_capnp.rs"));
 }
