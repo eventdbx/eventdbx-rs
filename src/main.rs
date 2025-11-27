@@ -2,9 +2,12 @@ use std::env;
 
 use clap::{Parser, Subcommand};
 use eventdbx_client::{
-    AppendEventRequest, ClientConfig, CreateAggregateRequest, EventDbxClient,
-    ListAggregatesOptions, ListEventsOptions, PatchEventRequest, SelectAggregateRequest,
-    SetAggregateArchiveRequest,
+    AppendEventRequest, ClientConfig, CreateAggregateRequest, CreateSnapshotRequest,
+    EventDbxClient, GetSnapshotRequest, ListAggregatesOptions, ListEventsOptions,
+    ListSchemasOptions, ListSnapshotsOptions, PatchEventRequest, ReplaceSchemasRequest,
+    SelectAggregateRequest, SetAggregateArchiveRequest, TenantAssignRequest,
+    TenantQuotaClearRequest, TenantQuotaRecalcRequest, TenantQuotaSetRequest, TenantReloadRequest,
+    TenantSchemaPublishRequest, TenantUnassignRequest,
 };
 use fake::Fake;
 use fake::faker::lorem::en::{Sentence, Word};
@@ -140,6 +143,87 @@ enum Commands {
         aggregate_type: Option<String>,
         #[arg(long = "aggregate-id", short = 'i')]
         aggregate_id: Option<String>,
+    },
+    /// Create a snapshot for an aggregate.
+    CreateSnapshot {
+        #[arg(long = "aggregate-type", short = 'a')]
+        aggregate_type: Option<String>,
+        #[arg(long = "aggregate-id", short = 'i')]
+        aggregate_id: Option<String>,
+        #[arg(long)]
+        comment: Option<String>,
+    },
+    /// List snapshots, optionally filtered by aggregate or version.
+    ListSnapshots {
+        #[arg(long = "aggregate-type", short = 'a')]
+        aggregate_type: Option<String>,
+        #[arg(long = "aggregate-id", short = 'i')]
+        aggregate_id: Option<String>,
+        #[arg(long)]
+        version: Option<u64>,
+    },
+    /// Fetch a snapshot by id.
+    GetSnapshot {
+        #[arg(long = "snapshot-id")]
+        snapshot_id: u64,
+    },
+    /// List the registered schemas.
+    ListSchemas,
+    /// Replace schemas with a JSON document.
+    ReplaceSchemas {
+        #[arg(long)]
+        schemas: Option<String>,
+    },
+    /// Assign a tenant to a shard.
+    TenantAssign {
+        #[arg(long)]
+        tenant_id: Option<String>,
+        #[arg(long)]
+        shard_id: Option<String>,
+    },
+    /// Unassign a tenant.
+    TenantUnassign {
+        #[arg(long)]
+        tenant_id: Option<String>,
+    },
+    /// Set a tenant storage quota (MB).
+    TenantQuotaSet {
+        #[arg(long)]
+        tenant_id: Option<String>,
+        #[arg(long)]
+        max_storage_mb: Option<u64>,
+    },
+    /// Clear a tenant storage quota.
+    TenantQuotaClear {
+        #[arg(long)]
+        tenant_id: Option<String>,
+    },
+    /// Recalculate a tenant's storage usage.
+    TenantQuotaRecalc {
+        #[arg(long)]
+        tenant_id: Option<String>,
+    },
+    /// Reload schemas for a tenant.
+    TenantReload {
+        #[arg(long)]
+        tenant_id: Option<String>,
+    },
+    /// Publish schemas for a tenant.
+    TenantSchemaPublish {
+        #[arg(long)]
+        tenant_id: Option<String>,
+        #[arg(long)]
+        reason: Option<String>,
+        #[arg(long)]
+        actor: Option<String>,
+        #[arg(long = "label", value_name = "LABEL", num_args(0..), value_delimiter = ',')]
+        labels: Vec<String>,
+        #[arg(long)]
+        activate: bool,
+        #[arg(long)]
+        force: bool,
+        #[arg(long)]
+        reload: bool,
     },
 }
 
@@ -340,6 +424,138 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 result.merkle_root
             );
         }
+        Commands::CreateSnapshot {
+            aggregate_type,
+            aggregate_id,
+            comment,
+        } => {
+            let aggregate_type = aggregate_type.unwrap_or_else(random_aggregate_type);
+            let aggregate_id = aggregate_id.unwrap_or_else(random_aggregate_id);
+            let mut request = CreateSnapshotRequest::new(
+                aggregate_type.clone(),
+                aggregate_id.clone(),
+            );
+            request.comment = comment;
+            let result = client.create_snapshot(request).await?;
+            println!("{}", serde_json::to_string_pretty(&result.snapshot)?);
+        }
+        Commands::ListSnapshots {
+            aggregate_type,
+            aggregate_id,
+            version,
+        } => {
+            let mut options = ListSnapshotsOptions::default();
+            options.aggregate_type = aggregate_type;
+            options.aggregate_id = aggregate_id;
+            options.version = version;
+            let result = client.list_snapshots(options).await?;
+            println!("{}", serde_json::to_string_pretty(&result.snapshots)?);
+        }
+        Commands::GetSnapshot { snapshot_id } => {
+            let request = GetSnapshotRequest {
+                snapshot_id,
+                token: None,
+            };
+            let result = client.get_snapshot(request).await?;
+            if let Some(snapshot) = result.snapshot {
+                println!("{}", serde_json::to_string_pretty(&snapshot)?);
+            } else {
+                println!("Snapshot {snapshot_id} not found.");
+            }
+        }
+        Commands::ListSchemas => {
+            let result = client.list_schemas(ListSchemasOptions::default()).await?;
+            println!("{}", serde_json::to_string_pretty(&result.schemas)?);
+        }
+        Commands::ReplaceSchemas { schemas } => {
+            let schemas_value = parse_json_arg(schemas.as_ref(), || json!({}))?;
+            let request = ReplaceSchemasRequest::new(schemas_value);
+            let result = client.replace_schemas(request).await?;
+            println!("Replaced {} schemas.", result.replaced);
+        }
+        Commands::TenantAssign { tenant_id, shard_id } => {
+            let tenant_id = tenant_id.unwrap_or_else(random_tenant_id);
+            let shard_id = shard_id.unwrap_or_else(random_shard_id);
+            let request = TenantAssignRequest::new(tenant_id.clone(), shard_id.clone());
+            let result = client.tenant_assign(request).await?;
+            println!(
+                "Tenant {tenant_id} assigned to shard {} (changed: {}).",
+                result.shard_id, result.changed
+            );
+        }
+        Commands::TenantUnassign { tenant_id } => {
+            let tenant_id = tenant_id.unwrap_or_else(random_tenant_id);
+            let request = TenantUnassignRequest::new(tenant_id.clone());
+            let result = client.tenant_unassign(request).await?;
+            println!(
+                "Tenant {tenant_id} unassigned (changed: {}).",
+                result.changed
+            );
+        }
+        Commands::TenantQuotaSet {
+            tenant_id,
+            max_storage_mb,
+        } => {
+            let tenant_id = tenant_id.unwrap_or_else(random_tenant_id);
+            let max_storage_mb = max_storage_mb.unwrap_or(1024);
+            let request = TenantQuotaSetRequest::new(tenant_id.clone(), max_storage_mb);
+            let result = client.tenant_quota_set(request).await?;
+            if let Some(quota) = result.quota_mb {
+                println!(
+                    "Quota for {tenant_id}: {quota} MB (changed: {}).",
+                    result.changed
+                );
+            } else {
+                println!(
+                    "Quota for {tenant_id} cleared (changed: {}).",
+                    result.changed
+                );
+            }
+        }
+        Commands::TenantQuotaClear { tenant_id } => {
+            let tenant_id = tenant_id.unwrap_or_else(random_tenant_id);
+            let request = TenantQuotaClearRequest::new(tenant_id.clone());
+            let result = client.tenant_quota_clear(request).await?;
+            println!("Quota cleared for {tenant_id} (changed: {}).", result.changed);
+        }
+        Commands::TenantQuotaRecalc { tenant_id } => {
+            let tenant_id = tenant_id.unwrap_or_else(random_tenant_id);
+            let request = TenantQuotaRecalcRequest::new(tenant_id.clone());
+            let result = client.tenant_quota_recalc(request).await?;
+            println!(
+                "Storage for {tenant_id}: {} bytes.",
+                result.storage_bytes
+            );
+        }
+        Commands::TenantReload { tenant_id } => {
+            let tenant_id = tenant_id.unwrap_or_else(random_tenant_id);
+            let request = TenantReloadRequest::new(tenant_id.clone());
+            let result = client.tenant_reload(request).await?;
+            println!("Tenant {tenant_id} reloaded: {}.", result.reloaded);
+        }
+        Commands::TenantSchemaPublish {
+            tenant_id,
+            reason,
+            actor,
+            labels,
+            activate,
+            force,
+            reload,
+        } => {
+            let tenant_id = tenant_id.unwrap_or_else(random_tenant_id);
+            let mut request = TenantSchemaPublishRequest::new(tenant_id.clone());
+            request.reason = reason;
+            request.actor = actor;
+            request.labels = labels;
+            request.activate = activate;
+            request.force = force;
+            request.reload = reload;
+            let result = client.tenant_schema_publish(request).await?;
+            println!(
+                "Published version {} for {tenant_id} (activated: {}, skipped: {}).",
+                result.version_id, result.activated, result.skipped
+            );
+        }
     }
 
     Ok(())
@@ -407,6 +623,14 @@ fn random_aggregate_id() -> String {
 
 fn random_event_type() -> String {
     format!("{}Event", capitalize(&Word().fake::<String>()))
+}
+
+fn random_tenant_id() -> String {
+    format!("tenant-{}", NumberWithFormat("#####").fake::<String>())
+}
+
+fn random_shard_id() -> String {
+    format!("shard-{}", NumberWithFormat("##").fake::<String>())
 }
 
 fn random_fields(count: usize) -> Vec<String> {

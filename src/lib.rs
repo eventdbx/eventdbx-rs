@@ -5,6 +5,7 @@ mod config;
 mod control_capnp;
 mod error;
 mod noise;
+mod schema_capnp;
 mod types;
 
 #[doc(hidden)]
@@ -17,8 +18,15 @@ pub use crate::config::ClientConfig;
 pub use crate::error::{Error, Result, ServerError};
 pub use crate::types::{
     AggregateSort, AggregateSortField, AppendEventRequest, AppendEventResult,
-    CreateAggregateRequest, CreateAggregateResult, GetAggregateResult, ListAggregatesOptions,
-    ListAggregatesResult, ListEventsOptions, ListEventsResult, PatchEventRequest, PatchEventResult,
-    PublishTarget, SelectAggregateRequest, SelectAggregateResult, SetAggregateArchiveRequest,
-    SetAggregateArchiveResult, VerifyAggregateResult,
+    CreateAggregateRequest, CreateAggregateResult, CreateSnapshotRequest, CreateSnapshotResult,
+    GetAggregateResult, GetSnapshotRequest, GetSnapshotResult, ListAggregatesOptions,
+    ListAggregatesResult,
+    ListEventsOptions, ListEventsResult, ListSchemasOptions, ListSchemasResult,
+    ListSnapshotsOptions, ListSnapshotsResult, PatchEventRequest, PatchEventResult, PublishTarget,
+    ReplaceSchemasRequest, ReplaceSchemasResult, SelectAggregateRequest, SelectAggregateResult,
+    SetAggregateArchiveRequest, SetAggregateArchiveResult, TenantAssignRequest, TenantAssignResult,
+    TenantQuotaClearRequest, TenantQuotaClearResult, TenantQuotaRecalcRequest,
+    TenantQuotaRecalcResult, TenantQuotaSetRequest, TenantQuotaSetResult, TenantReloadRequest,
+    TenantReloadResult, TenantSchemaPublishRequest, TenantSchemaPublishResult,
+    TenantUnassignRequest, TenantUnassignResult, VerifyAggregateResult,
 };

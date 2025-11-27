@@ -22,10 +22,16 @@ use crate::noise::{
 };
 use crate::types::{
     AggregateSortField, AppendEventRequest, AppendEventResult, CreateAggregateRequest,
-    CreateAggregateResult, GetAggregateResult, ListAggregatesOptions, ListAggregatesResult,
-    ListEventsOptions, ListEventsResult, PatchEventRequest, PatchEventResult,
-    SelectAggregateRequest, SelectAggregateResult, SetAggregateArchiveRequest,
-    SetAggregateArchiveResult, VerifyAggregateResult,
+    CreateAggregateResult, CreateSnapshotRequest, CreateSnapshotResult, GetAggregateResult,
+    GetSnapshotRequest, GetSnapshotResult, ListAggregatesOptions, ListAggregatesResult,
+    ListEventsOptions, ListEventsResult, ListSchemasOptions, ListSchemasResult,
+    ListSnapshotsOptions, ListSnapshotsResult, PatchEventRequest, PatchEventResult,
+    ReplaceSchemasRequest, ReplaceSchemasResult, SelectAggregateRequest, SelectAggregateResult,
+    SetAggregateArchiveRequest, SetAggregateArchiveResult, TenantAssignRequest, TenantAssignResult,
+    TenantQuotaClearRequest, TenantQuotaClearResult, TenantQuotaRecalcRequest,
+    TenantQuotaRecalcResult, TenantQuotaSetRequest, TenantQuotaSetResult, TenantReloadRequest,
+    TenantReloadResult, TenantSchemaPublishRequest, TenantSchemaPublishResult,
+    TenantUnassignRequest, TenantUnassignResult, VerifyAggregateResult,
 };
 
 /// Async client that can issue control-plane calls against an EventDBX server.
@@ -564,6 +570,427 @@ impl EventDbxClient {
                 }
                 _ => Err(Error::Protocol(
                     "verifyAggregate: unexpected payload".to_string(),
+                )),
+            },
+        )
+        .await
+    }
+
+    /// Creates a new snapshot for an aggregate.
+    pub async fn create_snapshot(
+        &self,
+        request: CreateSnapshotRequest,
+    ) -> Result<CreateSnapshotResult> {
+        self.invoke(
+            |raw| {
+                let mut payload = raw.reborrow().init_payload();
+                let mut create = payload.reborrow().init_create_snapshot();
+                create.set_aggregate_type(&request.aggregate_type);
+                create.set_aggregate_id(&request.aggregate_id);
+                create.set_token(self.token(request.token.as_deref()));
+                if let Some(comment) = request.comment.as_deref() {
+                    create.set_comment(comment);
+                    create.set_has_comment(true);
+                } else {
+                    create.set_has_comment(false);
+                }
+                Ok(())
+            },
+            |response| match response.get_payload().which()? {
+                control_capnp::control_response::payload::CreateSnapshot(resp) => {
+                    let resp = resp?;
+                    let snapshot_json = capnp_text_to_str(resp.get_snapshot_json())?;
+                    let snapshot = serde_json::from_str::<serde_json::Value>(snapshot_json)?;
+                    Ok(CreateSnapshotResult { snapshot })
+                }
+                control_capnp::control_response::payload::Error(err) => {
+                    Err(Error::Server(read_server_error(err?)?))
+                }
+                _ => Err(Error::Protocol(
+                    "createSnapshot: unexpected payload".to_string(),
+                )),
+            },
+        )
+        .await
+    }
+
+    /// Lists snapshots optionally filtered by aggregate or version.
+    pub async fn list_snapshots(
+        &self,
+        options: ListSnapshotsOptions,
+    ) -> Result<ListSnapshotsResult> {
+        self.invoke(
+            |raw| {
+                let mut payload = raw.reborrow().init_payload();
+                let mut list = payload.reborrow().init_list_snapshots();
+                list.set_token(self.token(options.token.as_deref()));
+
+                if let Some(aggregate_type) = options.aggregate_type.as_deref() {
+                    list.set_aggregate_type(aggregate_type);
+                    list.set_has_aggregate_type(true);
+                } else {
+                    list.set_has_aggregate_type(false);
+                }
+
+                if let Some(aggregate_id) = options.aggregate_id.as_deref() {
+                    list.set_aggregate_id(aggregate_id);
+                    list.set_has_aggregate_id(true);
+                } else {
+                    list.set_has_aggregate_id(false);
+                }
+
+                if let Some(version) = options.version {
+                    list.set_version(version);
+                    list.set_has_version(true);
+                } else {
+                    list.set_has_version(false);
+                }
+                Ok(())
+            },
+            |response| match response.get_payload().which()? {
+                control_capnp::control_response::payload::ListSnapshots(resp) => {
+                    let resp = resp?;
+                    let snapshots_json = capnp_text_to_str(resp.get_snapshots_json())?;
+                    let snapshots = serde_json::from_str::<serde_json::Value>(snapshots_json)?;
+                    Ok(ListSnapshotsResult { snapshots })
+                }
+                control_capnp::control_response::payload::Error(err) => {
+                    Err(Error::Server(read_server_error(err?)?))
+                }
+                _ => Err(Error::Protocol(
+                    "listSnapshots: unexpected payload".to_string(),
+                )),
+            },
+        )
+        .await
+    }
+
+    /// Fetches a single snapshot by id.
+    pub async fn get_snapshot(&self, request: GetSnapshotRequest) -> Result<GetSnapshotResult> {
+        self.invoke(
+            |raw| {
+                let mut payload = raw.reborrow().init_payload();
+                let mut get = payload.reborrow().init_get_snapshot();
+                get.set_snapshot_id(request.snapshot_id);
+                get.set_token(self.token(request.token.as_deref()));
+                Ok(())
+            },
+            |response| match response.get_payload().which()? {
+                control_capnp::control_response::payload::GetSnapshot(resp) => {
+                    let resp = resp?;
+                    let found = resp.get_found();
+                    let snapshot = if found {
+                        let json = capnp_text_to_str(resp.get_snapshot_json())?;
+                        Some(serde_json::from_str::<serde_json::Value>(json)?)
+                    } else {
+                        None
+                    };
+                    Ok(GetSnapshotResult { found, snapshot })
+                }
+                control_capnp::control_response::payload::Error(err) => {
+                    Err(Error::Server(read_server_error(err?)?))
+                }
+                _ => Err(Error::Protocol(
+                    "getSnapshot: unexpected payload".to_string(),
+                )),
+            },
+        )
+        .await
+    }
+
+    /// Lists all schemas known to the server.
+    pub async fn list_schemas(&self, options: ListSchemasOptions) -> Result<ListSchemasResult> {
+        self.invoke(
+            |raw| {
+                let mut payload = raw.reborrow().init_payload();
+                let mut list = payload.reborrow().init_list_schemas();
+                list.set_token(self.token(options.token.as_deref()));
+                Ok(())
+            },
+            |response| match response.get_payload().which()? {
+                control_capnp::control_response::payload::ListSchemas(resp) => {
+                    let resp = resp?;
+                    let schemas_json = capnp_text_to_str(resp.get_schemas_json())?;
+                    let schemas = serde_json::from_str::<serde_json::Value>(schemas_json)?;
+                    Ok(ListSchemasResult { schemas })
+                }
+                control_capnp::control_response::payload::Error(err) => {
+                    Err(Error::Server(read_server_error(err?)?))
+                }
+                _ => Err(Error::Protocol(
+                    "listSchemas: unexpected payload".to_string(),
+                )),
+            },
+        )
+        .await
+    }
+
+    /// Replaces schemas with the provided JSON blob.
+    pub async fn replace_schemas(
+        &self,
+        request: ReplaceSchemasRequest,
+    ) -> Result<ReplaceSchemasResult> {
+        self.invoke(
+            |raw| {
+                let mut payload = raw.reborrow().init_payload();
+                let mut replace = payload.reborrow().init_replace_schemas();
+                replace.set_token(self.token(request.token.as_deref()));
+                replace.set_schemas_json(&serde_json::to_string(&request.schemas)?);
+                Ok(())
+            },
+            |response| match response.get_payload().which()? {
+                control_capnp::control_response::payload::ReplaceSchemas(resp) => {
+                    let resp = resp?;
+                    Ok(ReplaceSchemasResult {
+                        replaced: resp.get_replaced(),
+                    })
+                }
+                control_capnp::control_response::payload::Error(err) => {
+                    Err(Error::Server(read_server_error(err?)?))
+                }
+                _ => Err(Error::Protocol(
+                    "replaceSchemas: unexpected payload".to_string(),
+                )),
+            },
+        )
+        .await
+    }
+
+    /// Assigns a tenant to a shard.
+    pub async fn tenant_assign(&self, request: TenantAssignRequest) -> Result<TenantAssignResult> {
+        self.invoke(
+            |raw| {
+                let mut payload = raw.reborrow().init_payload();
+                let mut assign = payload.reborrow().init_tenant_assign();
+                assign.set_token(self.token(request.token.as_deref()));
+                assign.set_tenant_id(&request.tenant_id);
+                assign.set_shard_id(&request.shard_id);
+                Ok(())
+            },
+            |response| match response.get_payload().which()? {
+                control_capnp::control_response::payload::TenantAssign(resp) => {
+                    let resp = resp?;
+                    Ok(TenantAssignResult {
+                        changed: resp.get_changed(),
+                        shard_id: capnp_text_to_string(resp.get_shard_id())?,
+                    })
+                }
+                control_capnp::control_response::payload::Error(err) => {
+                    Err(Error::Server(read_server_error(err?)?))
+                }
+                _ => Err(Error::Protocol(
+                    "tenantAssign: unexpected payload".to_string(),
+                )),
+            },
+        )
+        .await
+    }
+
+    /// Unassigns a tenant from any shard.
+    pub async fn tenant_unassign(
+        &self,
+        request: TenantUnassignRequest,
+    ) -> Result<TenantUnassignResult> {
+        self.invoke(
+            |raw| {
+                let mut payload = raw.reborrow().init_payload();
+                let mut unassign = payload.reborrow().init_tenant_unassign();
+                unassign.set_token(self.token(request.token.as_deref()));
+                unassign.set_tenant_id(&request.tenant_id);
+                Ok(())
+            },
+            |response| match response.get_payload().which()? {
+                control_capnp::control_response::payload::TenantUnassign(resp) => {
+                    let resp = resp?;
+                    Ok(TenantUnassignResult {
+                        changed: resp.get_changed(),
+                    })
+                }
+                control_capnp::control_response::payload::Error(err) => {
+                    Err(Error::Server(read_server_error(err?)?))
+                }
+                _ => Err(Error::Protocol(
+                    "tenantUnassign: unexpected payload".to_string(),
+                )),
+            },
+        )
+        .await
+    }
+
+    /// Sets or updates a tenant storage quota in megabytes.
+    pub async fn tenant_quota_set(
+        &self,
+        request: TenantQuotaSetRequest,
+    ) -> Result<TenantQuotaSetResult> {
+        self.invoke(
+            |raw| {
+                let mut payload = raw.reborrow().init_payload();
+                let mut set = payload.reborrow().init_tenant_quota_set();
+                set.set_token(self.token(request.token.as_deref()));
+                set.set_tenant_id(&request.tenant_id);
+                set.set_max_storage_mb(request.max_storage_mb);
+                Ok(())
+            },
+            |response| match response.get_payload().which()? {
+                control_capnp::control_response::payload::TenantQuotaSet(resp) => {
+                    let resp = resp?;
+                    let quota_mb = if resp.get_has_quota() {
+                        Some(resp.get_quota_mb())
+                    } else {
+                        None
+                    };
+                    Ok(TenantQuotaSetResult {
+                        changed: resp.get_changed(),
+                        quota_mb,
+                    })
+                }
+                control_capnp::control_response::payload::Error(err) => {
+                    Err(Error::Server(read_server_error(err?)?))
+                }
+                _ => Err(Error::Protocol(
+                    "tenantQuotaSet: unexpected payload".to_string(),
+                )),
+            },
+        )
+        .await
+    }
+
+    /// Clears a tenant storage quota.
+    pub async fn tenant_quota_clear(
+        &self,
+        request: TenantQuotaClearRequest,
+    ) -> Result<TenantQuotaClearResult> {
+        self.invoke(
+            |raw| {
+                let mut payload = raw.reborrow().init_payload();
+                let mut clear = payload.reborrow().init_tenant_quota_clear();
+                clear.set_token(self.token(request.token.as_deref()));
+                clear.set_tenant_id(&request.tenant_id);
+                Ok(())
+            },
+            |response| match response.get_payload().which()? {
+                control_capnp::control_response::payload::TenantQuotaClear(resp) => {
+                    let resp = resp?;
+                    Ok(TenantQuotaClearResult {
+                        changed: resp.get_changed(),
+                    })
+                }
+                control_capnp::control_response::payload::Error(err) => {
+                    Err(Error::Server(read_server_error(err?)?))
+                }
+                _ => Err(Error::Protocol(
+                    "tenantQuotaClear: unexpected payload".to_string(),
+                )),
+            },
+        )
+        .await
+    }
+
+    /// Recalculates storage usage for a tenant.
+    pub async fn tenant_quota_recalc(
+        &self,
+        request: TenantQuotaRecalcRequest,
+    ) -> Result<TenantQuotaRecalcResult> {
+        self.invoke(
+            |raw| {
+                let mut payload = raw.reborrow().init_payload();
+                let mut recalc = payload.reborrow().init_tenant_quota_recalc();
+                recalc.set_token(self.token(request.token.as_deref()));
+                recalc.set_tenant_id(&request.tenant_id);
+                Ok(())
+            },
+            |response| match response.get_payload().which()? {
+                control_capnp::control_response::payload::TenantQuotaRecalc(resp) => {
+                    let resp = resp?;
+                    Ok(TenantQuotaRecalcResult {
+                        storage_bytes: resp.get_storage_bytes(),
+                    })
+                }
+                control_capnp::control_response::payload::Error(err) => {
+                    Err(Error::Server(read_server_error(err?)?))
+                }
+                _ => Err(Error::Protocol(
+                    "tenantQuotaRecalc: unexpected payload".to_string(),
+                )),
+            },
+        )
+        .await
+    }
+
+    /// Reloads a tenant's schemas without redeploying them.
+    pub async fn tenant_reload(&self, request: TenantReloadRequest) -> Result<TenantReloadResult> {
+        self.invoke(
+            |raw| {
+                let mut payload = raw.reborrow().init_payload();
+                let mut reload = payload.reborrow().init_tenant_reload();
+                reload.set_token(self.token(request.token.as_deref()));
+                reload.set_tenant_id(&request.tenant_id);
+                Ok(())
+            },
+            |response| match response.get_payload().which()? {
+                control_capnp::control_response::payload::TenantReload(resp) => {
+                    let resp = resp?;
+                    Ok(TenantReloadResult {
+                        reloaded: resp.get_reloaded(),
+                    })
+                }
+                control_capnp::control_response::payload::Error(err) => {
+                    Err(Error::Server(read_server_error(err?)?))
+                }
+                _ => Err(Error::Protocol(
+                    "tenantReload: unexpected payload".to_string(),
+                )),
+            },
+        )
+        .await
+    }
+
+    /// Publishes schemas to a tenant with optional activation/reload flags.
+    pub async fn tenant_schema_publish(
+        &self,
+        request: TenantSchemaPublishRequest,
+    ) -> Result<TenantSchemaPublishResult> {
+        self.invoke(
+            |raw| {
+                let mut payload = raw.reborrow().init_payload();
+                let mut publish = payload.reborrow().init_tenant_schema_publish();
+                publish.set_token(self.token(request.token.as_deref()));
+                publish.set_tenant_id(&request.tenant_id);
+                if let Some(reason) = request.reason.as_deref() {
+                    publish.set_reason(reason);
+                    publish.set_has_reason(true);
+                } else {
+                    publish.set_has_reason(false);
+                }
+                if let Some(actor) = request.actor.as_deref() {
+                    publish.set_actor(actor);
+                    publish.set_has_actor(true);
+                } else {
+                    publish.set_has_actor(false);
+                }
+                let mut labels = publish.reborrow().init_labels(request.labels.len() as u32);
+                for (idx, label) in request.labels.iter().enumerate() {
+                    labels.set(idx as u32, label);
+                }
+                publish.set_activate(request.activate);
+                publish.set_force(request.force);
+                publish.set_reload(request.reload);
+                Ok(())
+            },
+            |response| match response.get_payload().which()? {
+                control_capnp::control_response::payload::TenantSchemaPublish(resp) => {
+                    let resp = resp?;
+                    Ok(TenantSchemaPublishResult {
+                        version_id: capnp_text_to_string(resp.get_version_id())?,
+                        activated: resp.get_activated(),
+                        skipped: resp.get_skipped(),
+                    })
+                }
+                control_capnp::control_response::payload::Error(err) => {
+                    Err(Error::Server(read_server_error(err?)?))
+                }
+                _ => Err(Error::Protocol(
+                    "tenantSchemaPublish: unexpected payload".to_string(),
                 )),
             },
         )

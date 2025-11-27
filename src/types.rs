@@ -229,6 +229,257 @@ pub struct VerifyAggregateResult {
 }
 
 #[derive(Debug, Clone)]
+pub struct CreateSnapshotRequest {
+    pub aggregate_type: String,
+    pub aggregate_id: String,
+    pub comment: Option<String>,
+    pub token: Option<String>,
+}
+
+impl CreateSnapshotRequest {
+    pub fn new(
+        aggregate_type: impl Into<String>,
+        aggregate_id: impl Into<String>,
+    ) -> Self {
+        Self {
+            aggregate_type: aggregate_type.into(),
+            aggregate_id: aggregate_id.into(),
+            comment: None,
+            token: None,
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct CreateSnapshotResult {
+    pub snapshot: Value,
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct ListSnapshotsOptions {
+    pub aggregate_type: Option<String>,
+    pub aggregate_id: Option<String>,
+    pub version: Option<u64>,
+    pub token: Option<String>,
+}
+
+#[derive(Debug, Clone)]
+pub struct ListSnapshotsResult {
+    pub snapshots: Value,
+}
+
+#[derive(Debug, Clone)]
+pub struct GetSnapshotRequest {
+    pub snapshot_id: u64,
+    pub token: Option<String>,
+}
+
+impl GetSnapshotRequest {
+    pub fn new(snapshot_id: u64) -> Self {
+        Self {
+            snapshot_id,
+            token: None,
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct GetSnapshotResult {
+    pub found: bool,
+    pub snapshot: Option<Value>,
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct ListSchemasOptions {
+    pub token: Option<String>,
+}
+
+#[derive(Debug, Clone)]
+pub struct ListSchemasResult {
+    pub schemas: Value,
+}
+
+#[derive(Debug, Clone)]
+pub struct ReplaceSchemasRequest {
+    pub schemas: Value,
+    pub token: Option<String>,
+}
+
+impl ReplaceSchemasRequest {
+    pub fn new(schemas: Value) -> Self {
+        Self {
+            schemas,
+            token: None,
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct ReplaceSchemasResult {
+    pub replaced: u32,
+}
+
+#[derive(Debug, Clone)]
+pub struct TenantAssignRequest {
+    pub tenant_id: String,
+    pub shard_id: String,
+    pub token: Option<String>,
+}
+
+impl TenantAssignRequest {
+    pub fn new(tenant_id: impl Into<String>, shard_id: impl Into<String>) -> Self {
+        Self {
+            tenant_id: tenant_id.into(),
+            shard_id: shard_id.into(),
+            token: None,
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct TenantAssignResult {
+    pub changed: bool,
+    pub shard_id: String,
+}
+
+#[derive(Debug, Clone)]
+pub struct TenantUnassignRequest {
+    pub tenant_id: String,
+    pub token: Option<String>,
+}
+
+impl TenantUnassignRequest {
+    pub fn new(tenant_id: impl Into<String>) -> Self {
+        Self {
+            tenant_id: tenant_id.into(),
+            token: None,
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct TenantUnassignResult {
+    pub changed: bool,
+}
+
+#[derive(Debug, Clone)]
+pub struct TenantQuotaSetRequest {
+    pub tenant_id: String,
+    pub max_storage_mb: u64,
+    pub token: Option<String>,
+}
+
+impl TenantQuotaSetRequest {
+    pub fn new(tenant_id: impl Into<String>, max_storage_mb: u64) -> Self {
+        Self {
+            tenant_id: tenant_id.into(),
+            max_storage_mb,
+            token: None,
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct TenantQuotaSetResult {
+    pub changed: bool,
+    pub quota_mb: Option<u64>,
+}
+
+#[derive(Debug, Clone)]
+pub struct TenantQuotaClearRequest {
+    pub tenant_id: String,
+    pub token: Option<String>,
+}
+
+impl TenantQuotaClearRequest {
+    pub fn new(tenant_id: impl Into<String>) -> Self {
+        Self {
+            tenant_id: tenant_id.into(),
+            token: None,
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct TenantQuotaClearResult {
+    pub changed: bool,
+}
+
+#[derive(Debug, Clone)]
+pub struct TenantQuotaRecalcRequest {
+    pub tenant_id: String,
+    pub token: Option<String>,
+}
+
+impl TenantQuotaRecalcRequest {
+    pub fn new(tenant_id: impl Into<String>) -> Self {
+        Self {
+            tenant_id: tenant_id.into(),
+            token: None,
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct TenantQuotaRecalcResult {
+    pub storage_bytes: u64,
+}
+
+#[derive(Debug, Clone)]
+pub struct TenantReloadRequest {
+    pub tenant_id: String,
+    pub token: Option<String>,
+}
+
+impl TenantReloadRequest {
+    pub fn new(tenant_id: impl Into<String>) -> Self {
+        Self {
+            tenant_id: tenant_id.into(),
+            token: None,
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct TenantReloadResult {
+    pub reloaded: bool,
+}
+
+#[derive(Debug, Clone)]
+pub struct TenantSchemaPublishRequest {
+    pub tenant_id: String,
+    pub reason: Option<String>,
+    pub actor: Option<String>,
+    pub labels: Vec<String>,
+    pub activate: bool,
+    pub force: bool,
+    pub reload: bool,
+    pub token: Option<String>,
+}
+
+impl TenantSchemaPublishRequest {
+    pub fn new(tenant_id: impl Into<String>) -> Self {
+        Self {
+            tenant_id: tenant_id.into(),
+            reason: None,
+            actor: None,
+            labels: Vec::new(),
+            activate: false,
+            force: false,
+            reload: false,
+            token: None,
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct TenantSchemaPublishResult {
+    pub version_id: String,
+    pub activated: bool,
+    pub skipped: bool,
+}
+
+#[derive(Debug, Clone)]
 pub struct PublishTarget {
     pub plugin: String,
     pub mode: Option<String>,
