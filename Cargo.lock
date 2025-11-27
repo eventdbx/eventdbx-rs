@@ -306,7 +306,7 @@ checksum = "edd0f118536f44f5ccd48bcb8b111bdc3de888b58c74639dfb034a357d0f206d"
 
 [[package]]
 name = "eventdbx-client"
-version = "0.1.1"
+version = "0.2.1"
 dependencies = [
  "capnp",
  "capnp-futures",

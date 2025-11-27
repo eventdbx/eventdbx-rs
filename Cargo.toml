@@ -1,6 +1,6 @@
 [package]
 name = "eventdbx-client"
-version = "0.1.1"
+version = "0.2.1"
 edition = "2024"
 build = "build.rs"
 authors = ["Patrick Thach <thachp@gmail.com>"]
